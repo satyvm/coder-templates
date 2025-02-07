@@ -11,6 +11,7 @@ RUN apt-get update \
     stow \
     tmux \
     neovim \
+    zsh \
     && rm -rf /var/lib/apt/lists/*
 
 ARG USER=coder
@@ -20,3 +21,8 @@ RUN useradd --groups sudo --no-create-home --shell /bin/bash ${USER} \
 
 USER ${USER}
 WORKDIR /home/${USER}
+
+RUN curl -Lo install.sh https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh && \
+    chmod +x install.sh && \
+    RUNZSH=no CHSH=no /bin/zsh install.sh && \
+    rm install.sh
