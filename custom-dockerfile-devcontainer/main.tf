@@ -7,9 +7,6 @@ terraform {
     docker = {
       source = "kreuzwerker/docker"
     }
-    envbuilder = {
-      source = "coder/envbuilder"
-    }
   }
 }
 
@@ -20,141 +17,56 @@ variable "docker_socket" {
 }
 
 provider "coder" {}
+
 provider "docker" {
   # Defaulting to null if the variable is an empty string lets us have an optional variable without having to set our own default
   host = var.docker_socket != "" ? var.docker_socket : null
 }
-provider "envbuilder" {}
 
 data "coder_provisioner" "me" {}
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
-data "coder_parameter" "repo" {
-  description  = "Select a repository to automatically clone and start working with a devcontainer."
-  display_name = "Repository (auto)"
+data "coder_parameter" "use_custom_dockerfile" {
+  name         = "use_custom_dockerfile"
+  display_name = "Use Custom Dockerfile"
+  description  = "Choose whether to use the custom Dockerfile or the default image"
   mutable      = true
-  name         = "repo"
-  option {
-    name        = "vercel/next.js"
-    description = "The React Framework"
-    value       = "https://github.com/vercel/next.js"
-  }
-  option {
-    name        = "home-assistant/core"
-    description = "🏡 Open source home automation that puts local control and privacy first."
-    value       = "https://github.com/home-assistant/core"
-  }
-  option {
-    name        = "discourse/discourse"
-    description = "A platform for community discussion. Free, open, simple."
-    value       = "https://github.com/discourse/discourse"
-  }
-  option {
-    name        = "denoland/deno"
-    description = "A modern runtime for JavaScript and TypeScript."
-    value       = "https://github.com/denoland/deno"
-  }
-  option {
-    name        = "microsoft/vscode"
-    icon        = "/icon/code.svg"
-    description = "Code editing. Redefined."
-    value       = "https://github.com/microsoft/vscode"
-  }
-  option {
-    name        = "Custom"
-    icon        = "/emojis/1f5c3.png"
-    description = "Specify a custom repo URL below"
-    value       = "custom"
-  }
-  order = 1
+  default      = true
+  type         = "bool"
+  order        = 0
 }
 
-data "coder_parameter" "custom_repo_url" {
-  default      = ""
-  description  = "Optionally enter a custom repository URL, see [awesome-devcontainers](https://github.com/manekinekko/awesome-devcontainers)."
-  display_name = "Repository URL (custom)"
-  name         = "custom_repo_url"
+data "coder_parameter" "base_image" {
+  name         = "base_image"
+  display_name = "Base Image"
+  description  = "The base image to use when not using the custom Dockerfile"
   mutable      = true
-  order        = 2
-}
-
-data "coder_parameter" "fallback_image" {
   default      = "codercom/enterprise-base:ubuntu"
-  description  = "This image runs if the devcontainer fails to build."
-  display_name = "Fallback Image"
-  mutable      = true
-  name         = "fallback_image"
-  order        = 3
-}
-
-data "coder_parameter" "devcontainer_builder" {
-  description  = <<-EOF
-Image that will build the devcontainer.
-We highly recommend using a specific release as the `:latest` tag will change.
-Find the latest version of Envbuilder here: https://github.com/coder/envbuilder/pkgs/container/envbuilder
-EOF
-  display_name = "Devcontainer Builder"
-  mutable      = true
-  name         = "devcontainer_builder"
-  default      = "ghcr.io/coder/envbuilder:latest"
-  order        = 4
-}
-
-variable "cache_repo" {
-  default     = ""
-  description = "(Optional) Use a container registry as a cache to speed up builds."
-  type        = string
-}
-
-variable "insecure_cache_repo" {
-  default     = false
-  description = "Enable this option if your cache registry does not serve HTTPS."
-  type        = bool
-}
-
-variable "cache_repo_docker_config_path" {
-  default     = ""
-  description = "(Optional) Path to a docker config.json containing credentials to the provided cache repo, if required."
-  sensitive   = true
-  type        = string
+  order        = 1
 }
 
 locals {
-  container_name             = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
-  devcontainer_builder_image = data.coder_parameter.devcontainer_builder.value
-  git_author_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
-  git_author_email           = data.coder_workspace_owner.me.email
-  repo_url                   = data.coder_parameter.repo.value == "custom" ? data.coder_parameter.custom_repo_url.value : data.coder_parameter.repo.value
-  # The envbuilder provider requires a key-value map of environment variables.
-  envbuilder_env = {
-    # ENVBUILDER_GIT_URL and ENVBUILDER_CACHE_REPO will be overridden by the provider
-    # if the cache repo is enabled.
-    "ENVBUILDER_GIT_URL" : local.repo_url,
-    "ENVBUILDER_CACHE_REPO" : var.cache_repo,
-    "CODER_AGENT_TOKEN" : coder_agent.main.token,
-    # Use the docker gateway if the access URL is 127.0.0.1
-    "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    # Use the docker gateway if the access URL is 127.0.0.1
-    "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    "ENVBUILDER_FALLBACK_IMAGE" : data.coder_parameter.fallback_image.value,
-    "ENVBUILDER_DOCKER_CONFIG_BASE64" : try(data.local_sensitive_file.cache_repo_dockerconfigjson[0].content_base64, ""),
-    "ENVBUILDER_PUSH_IMAGE" : var.cache_repo == "" ? "" : "true",
-    "ENVBUILDER_INSECURE" : "${var.insecure_cache_repo}",
+  container_name    = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+  git_author_name   = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
+  git_author_email  = data.coder_workspace_owner.me.email
+}
+
+# Build the custom Dockerfile when selected
+resource "docker_image" "custom_dockerfile" {
+  count = data.coder_parameter.use_custom_dockerfile.value ? 1 : 0
+  name = "custom-dockerfile-${data.coder_workspace.me.id}"
+  build {
+    context = "${path.module}/.devcontainer"
+    dockerfile = "Dockerfile"
   }
-  # Convert the above map to the format expected by the docker provider.
-  docker_env = [
-    for k, v in local.envbuilder_env : "${k}=${v}"
-  ]
+  keep_locally = true
 }
 
-data "local_sensitive_file" "cache_repo_dockerconfigjson" {
-  count    = var.cache_repo_docker_config_path == "" ? 0 : 1
-  filename = var.cache_repo_docker_config_path
-}
-
-resource "docker_image" "devcontainer_builder_image" {
-  name         = local.devcontainer_builder_image
+# Pull the base image when not using custom Dockerfile
+resource "docker_image" "base_image" {
+  count = data.coder_parameter.use_custom_dockerfile.value ? 0 : 1
+  name = data.coder_parameter.base_image.value
   keep_locally = true
 }
 
@@ -185,26 +97,14 @@ resource "docker_volume" "workspaces" {
   }
 }
 
-# Check for the presence of a prebuilt image in the cache repo
-# that we can use instead.
-resource "envbuilder_cached_image" "cached" {
-  count         = var.cache_repo == "" ? 0 : data.coder_workspace.me.start_count
-  builder_image = local.devcontainer_builder_image
-  git_url       = local.repo_url
-  cache_repo    = var.cache_repo
-  extra_env     = local.envbuilder_env
-  insecure      = var.insecure_cache_repo
-}
-
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = var.cache_repo == "" ? local.devcontainer_builder_image : envbuilder_cached_image.cached.0.image
+  # Use custom Dockerfile if selected, otherwise use base image
+  image = data.coder_parameter.use_custom_dockerfile.value ? docker_image.custom_dockerfile[0].image_id : docker_image.base_image[0].image_id
   # Uses lower() to avoid Docker restriction on container names.
   name = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   # Hostname makes the shell more user friendly: coder@my-workspace:~$
   hostname = data.coder_workspace.me.name
-  # Use the environment specified by the envbuilder provider, if available.
-  env = var.cache_repo == "" ? local.docker_env : envbuilder_cached_image.cached.0.env
   # network_mode = "host" # Uncomment if testing with a registry running on `localhost`.
   host {
     host = "host.docker.internal"
@@ -361,29 +261,12 @@ module "dotfiles" {
   agent_id = coder_agent.main.id
 }
 
-# module "filebrowser" {
-#   count    = data.coder_workspace.me.start_count
-#   source   = "registry.coder.com/modules/filebrowser/coder"
-#   version  = "1.0.29"
-#   folder = "/workspaces"
-#   agent_id = coder_agent.main.id
-#   order    = 5
-# }
-
 module "personalize" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/personalize/coder"
   version  = "1.0.2"
   agent_id = coder_agent.main.id
 }
-
-# module "jupyterlab" {
-#   count    = data.coder_workspace.me.start_count
-#   source   = "registry.coder.com/modules/jupyterlab/coder"
-#   version  = "1.0.23"
-#   agent_id = coder_agent.main.id
-#   order    = 4
-# }
 
 module "cursor" {
   count    = data.coder_workspace.me.start_count
@@ -399,14 +282,10 @@ resource "coder_metadata" "container_info" {
   resource_id = coder_agent.main.id
   item {
     key   = "workspace image"
-    value = var.cache_repo == "" ? local.devcontainer_builder_image : envbuilder_cached_image.cached.0.image
+    value = data.coder_parameter.use_custom_dockerfile.value ? "custom-dockerfile" : data.coder_parameter.base_image.value
   }
   item {
-    key   = "git url"
-    value = local.repo_url
-  }
-  item {
-    key   = "cache repo"
-    value = var.cache_repo == "" ? "not enabled" : var.cache_repo
+    key   = "using custom dockerfile"
+    value = data.coder_parameter.use_custom_dockerfile.value ? "yes" : "no"
   }
 }
