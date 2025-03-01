@@ -1,4 +1,4 @@
 .coder
-
+*/.DS_Store
 */.terraform
 */.terraform.lock.hcl

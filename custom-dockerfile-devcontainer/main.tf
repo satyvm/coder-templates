@@ -17,7 +17,6 @@ variable "docker_socket" {
 }
 
 provider "coder" {}
-
 provider "docker" {
   # Defaulting to null if the variable is an empty string lets us have an optional variable without having to set our own default
   host = var.docker_socket != "" ? var.docker_socket : null
