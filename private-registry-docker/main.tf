@@ -6,15 +6,16 @@ terraform {
     docker = {
       source = "kreuzwerker/docker"
     }
+    null = {
+      source = "hashicorp/null"
+    }
   }
 }
 
 locals {
   username = data.coder_workspace_owner.me.name
-  image_tag = data.coder_parameter.image_tag.value
-  registry_address = "registry.2centscapital.com"
-  image_name = "${local.registry_address}/synapse:${local.image_tag}"
-  use_dockerfile = data.coder_parameter.use_dockerfile.value == "true"
+  registry_address = "registry.example.com"
+  image_name = "${local.registry_address}/example:0.0.2"
 }
 
 variable "docker_socket" {
@@ -23,29 +24,33 @@ variable "docker_socket" {
   type        = string
 }
 
-variable "registry_username" {
-  description = "Username for the private Docker registry"
-  type        = string
-  default     = "satyam"
-  sensitive   = true
-}
+# Commenting out these variables as they are no longer needed
+# variable "registry_username" {
+#   description = "Username for the private Docker registry"
+#   type        = string
+#   sensitive   = true
+#   default     = "admin"
+# }
 
-variable "registry_password" {
-  description = "Password for the private Docker registry"
-  type        = string
-  default     = "Xivtem-zuqzu1-byjtyn"
-  sensitive   = true
-}
+# variable "registry_password" {
+#   description = "Password for the private Docker registry"
+#   type        = string
+#   sensitive   = true
+#   default     = "SecretPassword"
+# }
 
 provider "docker" {
-  # Defaulting to null if the variable is an empty string lets us have an optional variable without having to set our own default
   host = var.docker_socket != "" ? var.docker_socket : null
-
-  # Configure registry auth for the private registry
+  
   registry_auth {
-    address  = local.registry_address
-    username = var.registry_username
-    password = var.registry_password
+    address            = local.registry_address
+    config_file_content = jsonencode({
+      "auths": {
+        "registry.example.com": {
+          "auth": "SecretPassword"
+        }
+      }
+    })
   }
 }
 
@@ -80,32 +85,6 @@ data "coder_parameter" "custom_repo_url" {
   name         = "custom_repo_url"
   mutable      = true
   order        = 2
-}
-
-data "coder_parameter" "image_tag" {
-  default      = "0.0.1"
-  description  = "The tag of the synapse image to use from ${local.registry_address}/synapse."
-  display_name = "Image Tag"
-  name         = "image_tag"
-  mutable      = true
-  order        = 3
-}
-
-data "coder_parameter" "use_dockerfile" {
-  default      = "false"
-  description  = "Whether to build from Dockerfile instead of pulling directly from registry."
-  display_name = "Build from Dockerfile"
-  name         = "use_dockerfile"
-  mutable      = true
-  option {
-    name  = "Yes - Build from Dockerfile"
-    value = "true"
-  }
-  option {
-    name  = "No - Pull from registry"
-    value = "false"
-  }
-  order        = 4
 }
 
 resource "coder_agent" "main" {
@@ -266,30 +245,14 @@ resource "docker_volume" "home_volume" {
   }
 }
 
-# Pull the synapse image from the private registry or build from Dockerfile
-resource "docker_image" "synapse" {
+resource "docker_image" "main" {
   name = local.image_name
-  
-  # Only pull if not using Dockerfile
-  pull_triggers = local.use_dockerfile ? null : ["${timestamp()}"]
-  
-  # Only build if using Dockerfile
-  dynamic "build" {
-    for_each = local.use_dockerfile ? [1] : []
-    content {
-      context    = "${path.module}/build"
-      dockerfile = "Dockerfile"
-      tag        = [local.image_name]
-    }
-  }
-  
-  # Keep the image locally to avoid pulling it every time
   keep_locally = true
 }
 
 resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
-  image = docker_image.synapse.image_id
+  image = docker_image.main.name
   # Uses lower() to avoid Docker restriction on container names.
   name = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   # Hostname makes the shell more user friendly: coder@my-workspace:~$
@@ -374,22 +337,10 @@ resource "coder_metadata" "container_info" {
   resource_id = coder_agent.main.id
   item {
     key   = "image"
-    value = local.image_name
-  }
-  item {
-    key   = "image_tag"
-    value = local.image_tag
-  }
-  item {
-    key   = "build_method"
-    value = local.use_dockerfile ? "Built from Dockerfile" : "Pulled from registry"
+    value = docker_image.main.name
   }
   item {
     key   = "repo"
     value = data.coder_parameter.repo.value == "custom" ? data.coder_parameter.custom_repo_url.value : data.coder_parameter.repo.value
   }
 }
-
-# This template uses the synapse image from the private registry.
-# Users can specify which tag of the image to use via the "Image Tag" parameter.
-# Users can also choose to build from the Dockerfile instead of pulling directly from the registry.

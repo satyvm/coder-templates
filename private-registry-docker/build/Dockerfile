@@ -1,4 +1,4 @@
-FROM registry.2centscapital.com/synapse:0.0.1
+FROM registry.example.com/example:0.0.1
 
 ARG USER=coder
 RUN useradd --groups sudo --create-home --shell /bin/bash ${USER} \
