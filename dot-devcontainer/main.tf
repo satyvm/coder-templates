@@ -35,31 +35,11 @@ data "coder_parameter" "repo" {
   display_name = "Repository (auto)"
   mutable      = true
   name         = "repo"
+  default      = ""
   option {
-    name        = "vercel/next.js"
-    description = "The React Framework"
-    value       = "https://github.com/vercel/next.js"
-  }
-  option {
-    name        = "home-assistant/core"
-    description = "🏡 Open source home automation that puts local control and privacy first."
-    value       = "https://github.com/home-assistant/core"
-  }
-  option {
-    name        = "discourse/discourse"
-    description = "A platform for community discussion. Free, open, simple."
-    value       = "https://github.com/discourse/discourse"
-  }
-  option {
-    name        = "denoland/deno"
-    description = "A modern runtime for JavaScript and TypeScript."
-    value       = "https://github.com/denoland/deno"
-  }
-  option {
-    name        = "microsoft/vscode"
-    icon        = "/icon/code.svg"
-    description = "Code editing. Redefined."
-    value       = "https://github.com/microsoft/vscode"
+    name        = "None"
+    description = "Don't clone any repository"
+    value       = ""
   }
   option {
     name        = "Custom"

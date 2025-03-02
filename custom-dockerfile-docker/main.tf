@@ -36,12 +36,6 @@ data "coder_parameter" "repo" {
   name         = "repo"
   default      = ""
   option {
-    name        = "microsoft/vscode"
-    icon        = "/icon/code.svg"
-    description = "Code editing. Redefined."
-    value       = "https://github.com/microsoft/vscode"
-  }
-  option {
     name        = "None"
     description = "Don't clone any repository"
     value       = ""

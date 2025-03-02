@@ -79,30 +79,43 @@ Located in `dot-docker/`, this template:
 
 ### Local Development Workflow
 
+```
+cd <template-directory>
+```
+
 1. Make changes to the template files (main.tf, etc.)
 
-2. Validate your Terraform configuration:
+2. Initialize the Terraform working directory:
    ```bash
-   cd <template-directory>
+   terraform init
+   ```
+
+3. Validate your Terraform configuration:
+   ```bash
    terraform validate
    ```
 
-3. Format your Terraform files:
+4. Format your Terraform files:
    ```bash
    terraform fmt
    ```
 
-4. Test the template with Coder:
+5. Plan the changes:
+   ```bash
+   terraform plan
+   ```
+
+6. Test the template with Coder:
    ```bash
    coder templates create --directory ./<template-directory> --test
    ```
 
-5. Create a test workspace:
+7. Create a test workspace:
    ```bash
    coder create --template=<template-name> test-workspace
    ```
 
-6. After testing, clean up:
+8. After testing, clean up:
    ```bash
    coder delete test-workspace
    ```
