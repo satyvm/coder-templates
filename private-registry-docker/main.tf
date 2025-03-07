@@ -15,7 +15,7 @@ terraform {
 locals {
   username = data.coder_workspace_owner.me.name
   registry_address = "registry.example.com"
-  image_name = "${local.registry_address}/example:0.0.2"
+  image_name = "${local.registry_address}/example:latest"
 }
 
 variable "docker_socket" {
@@ -41,7 +41,7 @@ variable "docker_socket" {
 
 provider "docker" {
   host = var.docker_socket != "" ? var.docker_socket : null
-  
+
   registry_auth {
     address            = local.registry_address
     config_file_content = jsonencode({
@@ -100,7 +100,6 @@ resource "coder_agent" "main" {
     fi
 
     # Install the latest code-server.
-    # Append "--version x.x.x" to install a specific version of code-server.
     curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server
 
     # Start code-server in the background.
@@ -108,18 +107,17 @@ resource "coder_agent" "main" {
     
     # Clone repository if specified
     if [ -n "$REPO_URL" ]; then
-      # Create projects directory if it doesn't exist
+      # Navigate to home directory
       mkdir -p ~/projects
       cd ~/projects
       
-      # Clone the repository
+      # Clone the repository directly into home
       git clone $REPO_URL
       
-      # Extract repo name from URL for directory navigation
+      # Extract repo name from URL for display
       REPO_NAME=$(basename $REPO_URL .git)
-      cd $REPO_NAME
-      
-      echo "Cloned $REPO_URL into ~/projects/$REPO_NAME"
+      cd $REPO_NAME      
+      echo "Cloned $REPO_URL into /root/projects/$(basename $REPO_URL .git)"
     fi
   EOT
 
@@ -265,7 +263,7 @@ resource "docker_container" "workspace" {
     ip   = "host-gateway"
   }
   volumes {
-    container_path = "/home/${local.username}"
+    container_path = "/root/projects"
     volume_name    = docker_volume.home_volume.name
     read_only      = false
   }
@@ -299,7 +297,7 @@ module "jetbrains_gateway" {
   default        = "IU"
 
   # Default folder to open when starting a JetBrains IDE
-  folder = "/home/${local.username}"
+  folder = "/root/projects"
 
   # This ensures that the latest version of the module gets downloaded
   version = ">= 1.0.0"
@@ -327,7 +325,7 @@ module "cursor" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/modules/cursor/coder"
   version  = "1.0.19"
-  folder   = "/home/${local.username}"
+  folder   = "/root/projects"
   agent_id = coder_agent.main.id
   order    = 3
 }
